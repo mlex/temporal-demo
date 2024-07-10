@@ -2,38 +2,52 @@ package helloworld
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"time"
 
 	"go.temporal.io/sdk/activity"
 	_ "go.temporal.io/sdk/contrib/tools/workflowcheck/determinism"
-	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
 )
 
 func MyWorkflow(ctx workflow.Context, name string) (string, error) {
-	ao := workflow.ActivityOptions{
-		StartToCloseTimeout: 10 * time.Second,
-		RetryPolicy: &temporal.RetryPolicy{
-			MaximumAttempts: 50,
-			MaximumInterval: 10 * time.Second,
-		},
-	}
-	ctx = workflow.WithActivityOptions(ctx, ao)
-
 	logger := workflow.GetLogger(ctx)
 	logger.Info("HelloWorld workflow started", "name", name)
 
-	var result string
-	err := workflow.ExecuteActivity(ctx, MyActivity, name).Get(ctx, &result)
-	if err != nil {
-		logger.Error("Activity failed.", "Error", err)
-		return "", err
+	var signal interface{}
+	var signalReceived bool
+	signalChan := workflow.GetSignalChannel(ctx, "my-signal")
+	workflow.Go(ctx, func(ctx workflow.Context) {
+		for {
+			selector := workflow.NewSelector(ctx)
+			selector.AddReceive(signalChan, func(c workflow.ReceiveChannel, more bool) {
+				c.Receive(ctx, &signal)
+				signalReceived = true
+			})
+			selector.Select(ctx)
+		}
+	})
+
+	now := workflow.Now(ctx)
+	logger.Info("It's now " + now.String())
+	logger.Info("Sleeping until " + now.Add(30*time.Second).String())
+
+	ok, _ := workflow.AwaitWithTimeout(ctx, 30*time.Second, func() bool {
+		return signalReceived
+	})
+
+	if ok {
+		msg, _ := json.Marshal(signal)
+		logger.Info("Received signal: " + string(msg))
+	} else {
+		now = workflow.Now(ctx)
+		logger.Info("Waited too long - it's now " + now.String())
 	}
 
-	logger.Info("HelloWorld workflow completed, activity result: " + result)
+	logger.Info("HelloWorld workflow completed")
 
-	return result, nil
+	return "result", nil
 }
 
 func MyActivity(ctx context.Context, name string) (string, error) {
