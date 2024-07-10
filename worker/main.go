@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/temporalio/samples-go/helloworld"
+	"clickhouse.com/munich-sre-meetup/helloworld"
 	"go.temporal.io/sdk/client"
 	tlog "go.temporal.io/sdk/log"
 	"go.temporal.io/sdk/worker"
@@ -28,7 +28,6 @@ func main() {
 	w := worker.New(c, "hello-world", worker.Options{})
 
 	w.RegisterWorkflow(helloworld.MyWorkflow)
-	w.RegisterActivity(helloworld.MyActivity)
 
 	err = w.Run(worker.InterruptCh())
 	if err != nil {

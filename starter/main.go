@@ -4,9 +4,8 @@ import (
 	"context"
 	"log"
 
+	"clickhouse.com/munich-sre-meetup/helloworld"
 	"go.temporal.io/sdk/client"
-
-	"github.com/temporalio/samples-go/helloworld"
 )
 
 func main() {
